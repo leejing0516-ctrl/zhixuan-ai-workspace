@@ -107,6 +107,7 @@ $('login').addEventListener('click',()=>{
      account=data.user;$('account').textContent=`${account?.displayName||'Google 帳戶'}${account?.emailAddress?' · '+account.emailAddress:''}`;
      $('login').hidden=true;$('logout').hidden=false;$('refresh').disabled=false;
      $('status').textContent='已登入。按「即時重新整理」讀取所選範圍。';
+     $('result-note').textContent='已登入，尚未載入資料。請按上方「即時重新整理」（不是瀏覽器的重新整理）。';
     }catch(error){if(session.current(ticket))clearPrivate(error.status===401?'授權已失效。私人內容已清除，請重新登入。':'無法確認 Google 帳戶。請重新登入，並檢查 API 與權限設定。');}
    },error_callback:()=>{if(attempt===authGeneration)clearPrivate('登入視窗已關閉或遭阻擋，請重試。');}});
   client.requestAccessToken({prompt:'select_account'});
@@ -126,7 +127,14 @@ $('refresh').addEventListener('click',async()=>{
   for(const id of ['refresh','search','backups'])$(id).disabled=false;
   $('status').textContent=result.complete?'本次讀取完成。資料只保留在本頁記憶體。':'掃描未完整，數量僅為已讀取項目，不代表全部資料。';
  }catch(error){
-  if(session.current(ticket))clearPrivate(error.status===401?'授權已失效。私人內容已清除，請重新登入。':'讀取失敗（權限、網路或逾時）。私人內容已清除，請重新登入。');
+  if(!session.current(ticket))return;
+  if(error.status===401){clearPrivate('授權已失效。私人內容已清除，請重新登入。');return;}
+  $('refresh').disabled=false;
+  const code=Number.isInteger(error.status)?`HTTP ${error.status}`:'網路或逾時';
+  const hint=error.status===403?'請檢查 Google Drive API 是否啟用，以及此帳戶的讀取權限。':error.status===404?'請在「設定」確認根資料夾網址，並確認登入帳戶可以開啟該資料夾。':error.status===400?'資料查詢遭拒，請將這個錯誤狀態回報給 Hermes。':'請確認網路後，再按「即時重新整理」重試。';
+  $('status').textContent=`讀取失敗（${code}），已保留登入。${hint}`;
+  $('scope').textContent='範圍：本次讀取未完成。';
+  $('result-note').textContent='已登入，但本次資料讀取失敗；不代表資料夾沒有內容。';
  }
 });
 window.addEventListener('pagehide',()=>clearPrivate());

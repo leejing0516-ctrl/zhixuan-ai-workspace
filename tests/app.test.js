@@ -25,6 +25,7 @@ test('popup auth requests only metadata scope, rejects missing grant, then reads
  assert.equal(await evaluate('oauthOptions.scope'),'https://www.googleapis.com/auth/drive.metadata.readonly');assert.equal(await evaluate('oauthOptions.include_granted_scopes'),false);
  await evaluate("oauthOptions.callback({access_token:'synthetic-denied',scope:''})");assert.equal(await evaluate('networkCalls.length'),0);
  await login();assert.equal(await evaluate('networkCalls.length'),1);assert.match(await evaluate("document.getElementById('account').textContent"),/Synthetic User/);
+ assert.doesNotMatch(await evaluate("document.getElementById('result-note').textContent"),/尚未登入/,'signed-in empty state must not claim signed out');
  await refresh();assert.equal(await evaluate("document.getElementById('docs').textContent"),'0');assert.match(await evaluate("document.getElementById('scope').textContent"),/完整/);
  assert.match(await evaluate("document.getElementById('result-note').textContent"),/沒有可存取檔案/);
  await evaluate("document.getElementById('logout').click()");
@@ -50,6 +51,28 @@ test('pagehide clears rendered private state before browser history caching',opt
  assert.match(await evaluate("document.getElementById('account').textContent"),/Synthetic/);
  await evaluate("window.dispatchEvent(new Event('pagehide'))");
  assert.equal(await evaluate("document.getElementById('account').textContent"),'');assert.equal(await evaluate("document.getElementById('content').children.length"),0);assert.equal(await evaluate("document.getElementById('docs').textContent"),'—');assert.deepEqual(browser.exceptions,[]);
+});
+test('Drive read failure keeps the valid login and exposes an actionable status for retry',options,async()=>{
+ await evaluate("window.fetch=async url=>String(url).includes('/about?')?({ok:true,json:async()=>({user:{displayName:'Synthetic User'}})}):({ok:false,status:403})");
+ await login();
+ await evaluate("document.getElementById('refresh').click()");
+ await until("!document.getElementById('refresh').disabled || !document.getElementById('login').hidden");
+ assert.equal(await evaluate("document.getElementById('login').hidden"),true,'HTTP 403 is a read error, not proof that authentication expired');
+ assert.match(await evaluate("document.getElementById('account').textContent"),/Synthetic/);
+ assert.equal(await evaluate("document.getElementById('refresh').disabled"),false);
+ assert.match(await evaluate("document.getElementById('status').textContent"),/403/);
+ assert.doesNotMatch(await evaluate("document.getElementById('result-note').textContent"),/尚未登入/);
+ await evaluate("document.getElementById('logout').click()");
+});
+test('Drive read HTTP 401 still clears private state and requires Google sign-in',options,async()=>{
+ await evaluate("window.fetch=async url=>String(url).includes('/about?')?({ok:true,json:async()=>({user:{displayName:'Synthetic User'}})}):({ok:false,status:401})");
+ await login();
+ await evaluate("document.getElementById('refresh').click()");
+ await until("document.getElementById('login').hidden===false");
+ assert.equal(await evaluate("document.getElementById('account').textContent"),'');
+ assert.equal(await evaluate("document.getElementById('docs').textContent"),'—');
+ assert.equal(await evaluate("document.getElementById('refresh').disabled"),true);
+ assert.match(await evaluate("document.getElementById('status').textContent"),/授權已失效/);
 });
 test('expired account token clears private state and presents explicit re-login status',options,async()=>{
  await evaluate("window.fetch=async()=>({ok:false,status:401})");await login();
