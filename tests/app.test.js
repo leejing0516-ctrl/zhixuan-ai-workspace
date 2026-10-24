@@ -43,9 +43,17 @@ test('explore renders safe text links, actual categories, filtered backups and e
  await browser.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  await evaluate("document.querySelector('#content details').open=true");assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
 });
+test('category sidebar separates labels and numeric badges in compact readable rows',options,async()=>{
+ await browser.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+ const rows=await evaluate(`Array.from(document.querySelectorAll('#categories button')).map(b=>({name:b.querySelector('.category-name')?.textContent,count:b.querySelector('.category-count')?.textContent,aria:b.getAttribute('aria-label'),height:b.getBoundingClientRect().height,selected:b.getAttribute('aria-pressed')==='true',color:getComputedStyle(b).color,background:getComputedStyle(b).backgroundColor}))`);
+ assert.equal(rows[0].name,'全部文件');assert.equal(rows[0].count,'1');
+ assert.equal(rows[1].name,'A');assert.equal(rows[1].count,'1');assert.match(rows[1].aria,/1 份備份/);
+ assert.ok(rows.every(r=>r.height>=44&&r.height<=52));
+ assert.notEqual(rows.find(r=>r.selected).color,'rgb(255, 255, 255)');
+});
 test('category selection retains keyboard focus after rebuilding filters',options,async()=>{
  await evaluate("document.querySelectorAll('#categories button')[1].focus();document.querySelectorAll('#categories button')[1].click()");
- assert.match(await evaluate('document.activeElement.textContent'),/^A ·/);
+ assert.equal(await evaluate("document.activeElement.querySelector('.category-name').textContent"),'A');
 });
 test('pagehide clears rendered private state before browser history caching',options,async()=>{
  assert.match(await evaluate("document.getElementById('account').textContent"),/Synthetic/);

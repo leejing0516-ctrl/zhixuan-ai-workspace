@@ -47,12 +47,18 @@ function renderExplore(){
  if(!snapshot)return;
  const counts=summarize(snapshot.files),names=[...new Set([...snapshot.folders.filter(f=>f.parentId===snapshot.root.id).map(f=>f.name),...counts.categories.map(c=>c.name)])].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
  $('categories').replaceChildren();
- const addCategory=(name,label)=>{
-  const button=node('button',label);button.classList.toggle('active',category===name);button.setAttribute('aria-pressed',String(category===name));
+ const addCategory=(name,label,fileCount,backupCount)=>{
+  const button=node('button');button.className='category-button';button.classList.toggle('active',category===name);button.classList.toggle('is-empty',fileCount===0);button.setAttribute('aria-pressed',String(category===name));
+  const prefix=name.match(/^(\d{2})_/),displayName=prefix?label.slice(prefix[0].length):label;
+  const code=node('span',prefix?prefix[1]:name?'·':'全','category-code');code.setAttribute('aria-hidden','true');
+  const badge=node('span',String(fileCount),'category-count');badge.setAttribute('aria-hidden','true');
+  button.append(code,node('span',displayName,'category-name'),badge);
+  button.title=`${label}：${fileCount} 個檔案${backupCount?`，另有 ${backupCount} 份備份`:''}`;
+  button.setAttribute('aria-label',`${label}，${fileCount} 個檔案，${backupCount} 份備份`);
   button.addEventListener('click',()=>{category=name;renderExplore();$('categories').querySelector('button[aria-pressed="true"]')?.focus();});$('categories').append(button);
  };
- addCategory('','全部分類');
- for(const name of names){const count=counts.categories.find(c=>c.name===name)||{files:0,backups:0};addCategory(name,`${name} · ${count.files} 檔案 / ${count.backups} 備份`);}
+ addCategory('','全部文件',counts.docs+counts.other,counts.backups);
+ for(const name of names){const count=counts.categories.find(c=>c.name===name)||{files:0,backups:0};addCategory(name,name,count.files,count.backups);}
  const filtered=selectFiles(snapshot.files,{query:$('search').value,category,backups:$('backups').checked});
  $('content').replaceChildren();$('results-title').textContent=view==='tree'?'樹狀地圖':'近期檔案';
  $('result-note').textContent=filtered.length?`符合 ${filtered.length} 個檔案${snapshot.complete?'':'（僅已掃描部分）'}。`:snapshot.files.length?'沒有符合條件的檔案。':snapshot.complete?'此範圍沒有可存取檔案。':'掃描未完整；目前尚未讀到檔案，不能判定為空。';
