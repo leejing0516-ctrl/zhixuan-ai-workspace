@@ -9,6 +9,7 @@
 - access token、帳戶資訊、檔名、路徑及時間只留在 JavaScript 記憶體，不寫入 localStorage、sessionStorage、網址或日誌，不送到自建伺服器。Google 官方 GIS 仍依 Google 的服務及 Cookie 規則運作。
 - OAuth popup token model，只請求 `https://www.googleapis.com/auth/drive.metadata.readonly`；不讀取文件內文、不下載檔案、不呼叫修改 API。Google 授權範圍本身可讀取帳戶可存取的中繼資料，**不是資料夾層級 OAuth 權限**；本程式在前端額外限制只列出選定根資料夾後代。
 - 先確認授權，再用 `about.get` 讀取目前帳戶顯示名稱與電子郵件。按「即時重新整理」才開始讀取根資料夾與子項目。所有 API fetch 使用 GET、no-store、omit credentials、20 秒逾時。
+- 開啟或重新整理頁面時，若此瀏覽器先前已互動登入並同意本範圍，程式會以 Google 官方 token model 的靜默流程（`prompt:'none'`）嘗試自動恢復登入，不開跳出視窗、不需再按一次。這不會把 token 寫入 localStorage／sessionStorage——每次仍是即時重新跟 Google 要新的記憶體內 token，只是不需要使用者互動。靜默嘗試失敗時安靜回到一般未登入畫面，不顯示嚇人的錯誤訊息，仍可手動按「使用 Google 登入」。此行為依賴瀏覽器是否允許 Google 的靜默驗證（例如部分瀏覽器的第三方隱私限制可能使其失效），不保證每次都成功；失敗不代表帳號或設定有誤。
 - 登出此頁、設定儲存、pagehide、授權到期或 HTTP 401 時，清除私人渲染與記憶體，取消請求並使過期回應失效。其他資料讀取錯誤會清除本次未完成的文件畫面、保留有效登入並顯示 HTTP 狀態供重試；不把 403、404 或網路失敗誤判為授權到期。**不呼叫 revoke**，不撤銷使用者在其他頁面的整體 Google 授權。
 - 不含 analytics、外部字型、service worker、私人快取、後端、Google secrets 或 GitHub Actions。
 - GitHub Pages 是公開的；私人安全性依賴 Google 授權、前端約束與本機瀏覽器安全。同一 GitHub Pages origin 的其他程式或瀏覽器擴充功能可能讀取 localStorage；不要在共用／不受信任裝置保留設定。

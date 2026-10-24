@@ -91,33 +91,47 @@ function renderSnapshot(){
  $('docs').textContent=String(counts.docs);$('other').textContent=String(counts.other);$('backup-count').textContent=String(counts.backups);$('folders').textContent=String(snapshot.folders.length);
  $('scope').textContent=`範圍：${snapshot.root.name} 與可存取子項目｜${snapshot.complete?'完整掃描':'未完整掃描（達上限或 Google 回傳不完整結果）'}｜快照 ${new Date(snapshot.at).toLocaleString('zh-TW')}`;
 }
-$('login').addEventListener('click',()=>{
- if(!config){openSetup();return;}
- clearPrivate('正在等待 Google 授權…');
+async function applyTokenResponse(response,attempt,{silent}){
+ if(attempt!==authGeneration)return;
  const gis=globalThis.google?.accounts?.oauth2;
- if(!gis){$('status').textContent='Google 登入元件尚未載入或被阻擋，請稍後重試。';return;}
+ if(response.error||!response.access_token||!gis?.hasGrantedAllScopes(response,SCOPE)){
+  if(!silent)clearPrivate('未取得所需的中繼資料唯讀授權，請重新登入。');
+  return;
+ }
+ const ticket=session.start(response.access_token);
+ const seconds=Number(response.expires_in);
+ if(!Number.isFinite(seconds)||seconds<=0){clearPrivate('授權有效期限不正確，請重新登入。');return;}
+ expiry=setTimeout(()=>clearPrivate('授權已到期，私人內容已清除。請重新登入。'),Math.min(seconds*1000,2147483647));
+ try{
+  const data=await metadataRequest(session.token,ticket.signal)('about',{fields:'user(displayName,emailAddress)'});
+  if(!session.current(ticket))return;
+  account=data.user;$('account').textContent=`${account?.displayName||'Google 帳戶'}${account?.emailAddress?' · '+account.emailAddress:''}`;
+  $('login').hidden=true;$('logout').hidden=false;$('refresh').disabled=false;
+  $('status').textContent=silent?'已自動恢復登入。按「即時重新整理」讀取所選範圍。':'已登入。按「即時重新整理」讀取所選範圍。';
+  $('result-note').textContent='已登入，尚未載入資料。請按上方「即時重新整理」（不是瀏覽器的重新整理）。';
+ }catch(error){
+  if(session.current(ticket))clearPrivate(error.status===401?'授權已失效。私人內容已清除，請重新登入。':silent?'尚未登入；請登入並授權後讀取私人資料。':'無法確認 Google 帳戶。請重新登入，並檢查 API 與權限設定。');
+ }
+}
+function requestToken({interactive}){
+ const gis=globalThis.google?.accounts?.oauth2;
+ if(!gis){if(interactive)$('status').textContent='Google 登入元件尚未載入或被阻擋，請稍後重試。';return;}
+ if(interactive){clearPrivate('正在等待 Google 授權…');$('login').disabled=true;$('logout').hidden=false;}
  const attempt=authGeneration;
- $('login').disabled=true;$('logout').hidden=false;
  try{
   const client=gis.initTokenClient({client_id:config.clientId,scope:SCOPE,include_granted_scopes:false,
-   callback:async response=>{
-    if(attempt!==authGeneration)return;
-    if(response.error||!response.access_token||!gis.hasGrantedAllScopes(response,SCOPE)){clearPrivate('未取得所需的中繼資料唯讀授權，請重新登入。');return;}
-    const ticket=session.start(response.access_token);
-    const seconds=Number(response.expires_in);
-    if(!Number.isFinite(seconds)||seconds<=0){clearPrivate('授權有效期限不正確，請重新登入。');return;}
-    expiry=setTimeout(()=>clearPrivate('授權已到期，私人內容已清除。請重新登入。'),Math.min(seconds*1000,2147483647));
-    try{
-     const data=await metadataRequest(session.token,ticket.signal)('about',{fields:'user(displayName,emailAddress)'});
-     if(!session.current(ticket))return;
-     account=data.user;$('account').textContent=`${account?.displayName||'Google 帳戶'}${account?.emailAddress?' · '+account.emailAddress:''}`;
-     $('login').hidden=true;$('logout').hidden=false;$('refresh').disabled=false;
-     $('status').textContent='已登入。按「即時重新整理」讀取所選範圍。';
-     $('result-note').textContent='已登入，尚未載入資料。請按上方「即時重新整理」（不是瀏覽器的重新整理）。';
-    }catch(error){if(session.current(ticket))clearPrivate(error.status===401?'授權已失效。私人內容已清除，請重新登入。':'無法確認 Google 帳戶。請重新登入，並檢查 API 與權限設定。');}
-   },error_callback:()=>{if(attempt===authGeneration)clearPrivate('登入視窗已關閉或遭阻擋，請重試。');}});
-  client.requestAccessToken({prompt:'select_account'});
- }catch{clearPrivate('無法啟動 Google 登入，請檢查 Web 用戶端與授權來源。');}
+   callback:response=>applyTokenResponse(response,attempt,{silent:!interactive}),
+   error_callback:()=>{if(interactive&&attempt===authGeneration)clearPrivate('登入視窗已關閉或遭阻擋，請重試。');}});
+  client.requestAccessToken(interactive?{prompt:'select_account'}:{prompt:'none'});
+ }catch{if(interactive)clearPrivate('無法啟動 Google 登入，請檢查 Web 用戶端與授權來源。');}
+}
+async function trySilentResume(){
+ for(let i=0;i<50&&!globalThis.google?.accounts?.oauth2;i++)await new Promise(resolve=>setTimeout(resolve,100));
+ if(globalThis.google?.accounts?.oauth2)requestToken({interactive:false});
+}
+$('login').addEventListener('click',()=>{
+ if(!config){openSetup();return;}
+ requestToken({interactive:true});
 });
 $('refresh').addEventListener('click',async()=>{
  if(!session.token||!config)return;
@@ -146,4 +160,4 @@ $('refresh').addEventListener('click',async()=>{
 window.addEventListener('pagehide',()=>clearPrivate());
 $('logout').addEventListener('click',()=>clearPrivate());
 clearPrivate(config?'尚未登入；請登入並授權後讀取私人資料。':'需要初次設定：請填入 Web 公開用戶端 ID 與私人根資料夾。');
-if(!config)openSetup();
+if(!config)openSetup();else trySilentResume();

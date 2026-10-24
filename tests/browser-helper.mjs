@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const project=fileURLToPath(new URL('../',import.meta.url));
 export const chromePath=process.env.CHROME_PATH||['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/usr/bin/chromium','/usr/bin/google-chrome'].find(existsSync);
-export async function openBrowser(){
+export async function openBrowser({seedConfig}={}){
  const base=join(project,'.browser-profile');await mkdir(base,{recursive:true});const profile=await mkdtemp(join(base,'integration-'));
  const server=createServer(async(req,res)=>{
   const name=req.url==='/'?'index.html':req.url.slice(1).split('?')[0];
@@ -36,7 +36,8 @@ export async function openBrowser(){
   // The only mocked components: Google GIS and Google network responses.
   await send('Network.setBlockedURLs',{urls:['https://accounts.google.com/*']});
   await send('Page.addScriptToEvaluateOnNewDocument',{source:`
-   window.google={accounts:{oauth2:{initTokenClient(options){window.oauthOptions=options;return {requestAccessToken(){}};},hasGrantedAllScopes(response,scope){return response.scope===scope;}}}};
+   ${seedConfig?`localStorage.setItem('zhixuan-workspace.public-config.v1', ${JSON.stringify(JSON.stringify(seedConfig))});`:''}
+   window.google={accounts:{oauth2:{initTokenClient(options){window.oauthOptions=options;return {requestAccessToken(overrideConfig){window.tokenRequests=(window.tokenRequests||[]);window.tokenRequests.push(overrideConfig);}};},hasGrantedAllScopes(response,scope){return response.scope===scope;}}}};
    window.networkCalls=[];
    window.fetch=async(url,options)=>{window.networkCalls.push({url,options});return {ok:true,json:async()=>String(url).includes('/about?')?{user:{displayName:'Synthetic User',emailAddress:'synthetic@example.invalid'}}:String(url).includes('/files/')?{id:'synthetic_root_123456789',name:'Synthetic root',mimeType:'application/vnd.google-apps.folder'}:{files:[]}};};
   `});

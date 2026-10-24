@@ -6,10 +6,38 @@ before(async()=>{if(chromePath)browser=await openBrowser();});
 after(async()=>{await browser?.close();});
 const options={skip:!chromePath?'Set CHROME_PATH to run real-browser integration tests':false};
 const evaluate=expression=>browser.evaluate(expression);
-async function until(expression){for(let i=0;i<100;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,20));}assert.fail('Browser condition timed out: '+expression);}
+async function until(expression,evaluateFn=evaluate){for(let i=0;i<100;i++){if(await evaluateFn(expression))return;await new Promise(r=>setTimeout(r,20));}assert.fail('Browser condition timed out: '+expression);}
 const login=()=>evaluate(`(async()=>{document.getElementById('login').click();await oauthOptions.callback({access_token:'synthetic-token',scope:oauthOptions.scope,expires_in:3600});})()`);
 const refresh=async()=>{await evaluate("document.getElementById('refresh').click()");await until("document.getElementById('refresh').disabled===false");};
 // Every identifier, account and response is synthetic. Only GIS and network are mocked.
+test('an already-consented browser restores login silently on page load without a click',options,async()=>{
+ const resumed=await openBrowser({seedConfig:{clientId:'123456789-synthetic.apps.googleusercontent.com',rootId:'synthetic_root_123456789'}});
+ try{
+  assert.equal(await resumed.evaluate("document.getElementById('setup').open"),false,'a known device/browser config must skip the setup dialog');
+  assert.equal(await resumed.evaluate("document.getElementById('login').hidden"),false,'no UI jump before the silent attempt resolves');
+  await resumed.evaluate("window.fetch=async()=>({ok:true,json:async()=>({user:{displayName:'Resumed User'}})})");
+  await until("window.tokenRequests?.length>0",resumed.evaluate);
+  assert.deepEqual(await resumed.evaluate('tokenRequests[0]'),{prompt:'none'},'automatic resume must never show an interactive consent/account picker');
+  await resumed.evaluate("oauthOptions.callback({access_token:'resumed-token',scope:oauthOptions.scope,expires_in:3600})");
+  await until("document.getElementById('login').hidden===true",resumed.evaluate);
+  assert.match(await resumed.evaluate("document.getElementById('account').textContent"),/Resumed User/);
+  assert.match(await resumed.evaluate("document.getElementById('status').textContent"),/自動恢復登入/);
+  assert.deepEqual(resumed.exceptions,[]);
+ }finally{await resumed.close();}
+});
+test('silent resume failure stays quiet with no account and still offers manual login',options,async()=>{
+ const resumed=await openBrowser({seedConfig:{clientId:'123456789-synthetic.apps.googleusercontent.com',rootId:'synthetic_root_123456789'}});
+ try{
+  await until("window.tokenRequests?.length>0",resumed.evaluate);
+  await resumed.evaluate("oauthOptions.callback({error:'interaction_required'})");
+  await new Promise(r=>setTimeout(r,80));
+  assert.equal(await resumed.evaluate("document.getElementById('account').textContent"),'');
+  assert.equal(await resumed.evaluate("document.getElementById('login').hidden"),false);
+  assert.equal(await resumed.evaluate("document.getElementById('login').disabled"),false);
+  assert.doesNotMatch(await resumed.evaluate("document.getElementById('status').textContent"),/未取得所需的中繼資料|無法確認 Google 帳戶/,'a quiet silent failure must not show the alarming interactive-only wording');
+  assert.deepEqual(resumed.exceptions,[]);
+ }finally{await resumed.close();}
+});
 test('first use opens working configuration, saves only validated public settings and stays signed out',options,async()=>{
  assert.equal(await evaluate("document.getElementById('setup').open"),true);
  assert.match(await evaluate("document.getElementById('status').textContent"),/設定/);
