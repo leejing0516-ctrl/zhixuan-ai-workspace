@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+*google_token*
+*google_client_secret*
+*client_secret*
+*private*config*
+private/
+data/
+snapshots/
+.browser-profile/
+.DS_Store
+*.log

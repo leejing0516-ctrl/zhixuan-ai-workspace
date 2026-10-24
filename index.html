@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; frame-src https://accounts.google.com/gsi/; connect-src 'self' https://accounts.google.com/gsi/ https://www.googleapis.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>阿軒 AI 工作站</title>
+<link rel="stylesheet" href="./styles.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script type="module" src="./app.js"></script>
+</head>
+<body>
+<a class="skip" href="#explore">跳至探索內容</a>
+<header><div><p class="eyebrow">PERSONAL KNOWLEDGE / 私人知識入口</p><h1>阿軒 AI 工作站</h1></div><nav aria-label="帳戶操作"><button id="configure">設定</button><button id="login" class="primary">使用 Google 登入</button><button id="logout" hidden>登出此頁</button></nav></header>
+<main>
+<section class="notice" aria-label="連線與隱私"><p id="status" role="status" aria-live="polite">尚未登入；私人資料不會顯示。</p><p id="account"></p><p class="muted">僅讀取中繼資料，不讀取文件內文。登出即清除此頁私人內容，不撤銷 Google 整體授權。</p></section>
+<section id="explore" aria-labelledby="explore-title">
+<div class="section-head"><div><p class="eyebrow">EXPLORE</p><h2 id="explore-title">探索工作資料</h2></div><button id="refresh" disabled>即時重新整理</button></div>
+<p id="scope" class="muted">範圍：尚未選定。登入後手動讀取選定資料夾與可存取的子項目。</p>
+<div class="toolbar"><label class="search">搜尋名稱或路徑<input id="search" type="search" placeholder="輸入關鍵字" disabled></label><label class="check"><input id="backups" type="checkbox" disabled>包含 Markdown 備份</label><div class="views" role="group" aria-label="內容檢視"><button id="list-view" aria-pressed="true">近期檔案</button><button id="tree-view" aria-pressed="false">樹狀地圖</button></div></div>
+<div class="workspace"><aside aria-labelledby="category-title"><h3 id="category-title">分類</h3><div id="categories"><p class="muted">登入後依實際資料夾排列。</p></div></aside><section class="results" aria-labelledby="results-title"><h3 id="results-title">近期檔案</h3><p id="result-note" class="muted">尚未登入，無可顯示的私人項目。</p><div id="content"></div></section></div>
+</section>
+<section class="monitor" aria-labelledby="monitor-title"><h2 id="monitor-title">資料概況</h2><dl><div><dt>Google 文件</dt><dd id="docs">—</dd></div><div><dt>其他檔案</dt><dd id="other">—</dd></div><div><dt>Markdown 備份</dt><dd id="backup-count">—</dd></div><div><dt>子資料夾</dt><dd id="folders">—</dd></div></dl><p class="muted">備份獨立計數，不代表另一份研究成果。子資料夾數不含根目錄。</p></section>
+</main>
+<footer>私人資料只停留在本頁記憶體。公開網站不包含文件清單，也不會自動排程掃描。</footer>
+<dialog id="setup" aria-labelledby="setup-title"><form id="setup-form"><h2 id="setup-title">設定私人工作範圍</h2><p>需要 Google OAuth「Web 應用程式」公開用戶端 ID；桌面版 ID 不適用。此頁無法單靠格式判斷用戶端類型。</p><label>公開用戶端 ID<input id="client-id" required autocomplete="off" spellcheck="false" placeholder="…apps.googleusercontent.com"></label><label>私人根資料夾 ID 或官方網址<input id="root-id" required autocomplete="off" spellcheck="false" placeholder="Google Drive 資料夾網址"></label><p class="muted">僅這兩項設定儲存在此瀏覽器 localStorage。不要輸入 client_secret 或存取權杖。儲存會登出並清除舊私人內容。</p><p id="setup-error" role="alert"></p><div class="dialog-actions"><button type="button" id="forget">清除此機設定</button><button type="button" id="cancel-setup">取消</button><button type="submit" class="primary">儲存設定</button></div></form></dialog>
+<noscript>本頁需要 JavaScript；未啟用時不會讀取私人資料。</noscript>
+</body></html>
